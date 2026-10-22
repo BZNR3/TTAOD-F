@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .checkloss_hook import CheckInvalidLossHook
 from .mean_teacher_hook import MeanTeacherHook
+from .paper_prompt_mean_teacher_hook import PaperPromptMeanTeacherHook
 from .memory_profiler_hook import MemoryProfilerHook
 from .num_class_check_hook import NumClassCheckHook
 from .pipeline_switch_hook import PipelineSwitchHook
@@ -15,7 +16,8 @@ from .yolox_mode_switch_hook import YOLOXModeSwitchHook
 __all__ = [
     'YOLOXModeSwitchHook', 'SyncNormHook', 'CheckInvalidLossHook',
     'SetEpochInfoHook', 'MemoryProfilerHook', 'DetVisualizationHook',
-    'NumClassCheckHook', 'MeanTeacherHook', 'trigger_visualization_hook',
+    'NumClassCheckHook', 'MeanTeacherHook', 'PaperPromptMeanTeacherHook',
+    'trigger_visualization_hook',
     'PipelineSwitchHook', 'TrackVisualizationHook',
     'GroundingVisualizationHook'
 ]
