@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+data/
+download/
+prompt_init/
+work_dirs/
+results/
