@@ -71,6 +71,14 @@ The run records per-batch prediction, pseudo-labeling, and student-update time,
 selected parameters, initial/final prompt hashes, frozen parameter hashes,
 losses, and all raw predictions.
 
+## Result
+
+The verified A100 run on all 5,000 COCO-C Gaussian severity-5 images achieved
+**19.78 mAP / 29.11 AP50**, versus **13.82 / 20.59** for the frozen source.
+See the [full experiment report](reports/coco_gaussian_a100_20261022.md) for
+all COCO metrics, timing, checksums, and the comparison with the complete
+TTAOD-F run.
+
 ## License and citation
 
 The upstream project is distributed under the Apache 2.0 license retained in
