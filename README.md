@@ -1,54 +1,78 @@
-# ttaod_foundation
+# TTAOD-F MPMT without memory
 
-This is the implementation of the paper "Test-Time Adaptive Object Detection with Foundation Model" (Neurips 2025, [arxiv](https://arxiv.org/pdf/2510.25175))
+This repository is a reproducible ablation of
+[TTAOD-F](https://github.com/gaoyingjay/TTAOD-F), based on official commit
+`16635fd26505d38cab79ef6dccc4efb2d24fca02` and the NeurIPS 2025 paper
+*Test-Time Adaptive Object Detection with Foundation Model*.
 
-## Installation
+The experiment answers one narrow question: how does the paper's complete
+Multi-modal Prompt-based Mean-Teacher (MPMT) perform on COCO-C Gaussian noise
+severity 5 when all memory functionality is removed?
 
-Please refer to mmdetection [Installation](https://mmdetection.readthedocs.io/en/latest/get_started.html) for installation instructions. Note:
+## Exact ablation
 
-* pytorch==1.11.0+cu113
-* mmcv==2.0.0rc4, mmengine==0.10.7
+Enabled:
 
-## Prepare Data
+- text prompt tuning (TPT), AdamW learning rate 0.02;
+- 10-token deep visual prompt tuning (VPT), AdamW learning rate 0.2;
+- the paper's first-image Test-time Warm-start (TTWS);
+- EMA teacher on weak views and student on strong views;
+- native Grounding DINO classification/localization losses;
+- prompt-only teacher EMA with retention 0.999;
+- batch size 4, one ordered pass over all 5,000 COCO-C images.
 
-We construct cross-corruption benchmark by transforming PASCAL into **PASCAL-C** and COCO into **COCO-C**. Both datasets are generated using the [imagecorruptions](https://github.com/bethgelab/imagecorruptions) package, which applies 15 types of corruption to each image at a severity level of 5.
+Disabled by construction:
 
+- DINOv2;
+- Instance Dynamic Memory (IDM);
+- Memory Enhancement (ME);
+- Memory Hallucination (MH).
 
-## Training
-1. Run TTWS:
+The public upstream loop freezes `tunable_linear.weight` and therefore does
+not actually train the paper's text prompt. This fork uses a dedicated online
+loop that explicitly selects both text and visual prompts and verifies that
+all frozen detector parameters remain byte-identical.
+
+## Online protocol
+
+For each batch, the EMA teacher first predicts the test view. Those predictions
+are saved before the current batch can update the model. The teacher then
+generates pseudo-labels from a weak view, the student optimizes its prompts on
+a strong view, and the teacher prompts receive an EMA update. Runtime model
+branches read an annotation manifest with an empty `annotations` array; real
+COCO ground truth is opened only by the separate offline evaluator.
+
+## Run
+
+The Markov defaults are encoded in
+`configs/mm_grounding_dino/ttaod/mpmt_no_memory_coco_gaussian.py`. Paths can be
+overridden with `TTAOD_COCO_C_ROOT`, `TTAOD_GTFREE_ANN`, `TTAOD_TTWS_FILE`, and
+`TTAOD_CHECKPOINT`.
+
+```bash
+CUDA_VISIBLE_DEVICES=GPU-9a80f124-e0ed-73a1-11aa-21b0ab8093f0 \
+PYTHONPATH=. /bigdata/baoming/miniconda3/envs/ttaod/bin/python train.py \
+  configs/mm_grounding_dino/ttaod/mpmt_no_memory_coco_gaussian.py \
+  --work-dir work_dirs/mpmt_no_memory_coco_gaussian
 ```
-python test.py configs/mm_grounding_dino/ttaod/ttaod_grounding_dino_swin-t_voc-c.py
-  download/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth
-  --cfg-options corruption_type='gaussian_noise' 
-  detector.backbone.TTWS_init=True  
-  detector.backbone.TTWS_file='prompt_init/voc-c/prompt_voc_gaussian_noise.pth'
-  --work-dir work_dirs/prompt_init
+
+Evaluate only after the online prediction file has closed:
+
+```bash
+PYTHONPATH=. /bigdata/baoming/miniconda3/envs/ttaod/bin/python \
+  tools/summarize_mpmt_no_memory.py \
+  --annotations /bigdata/baoming/datasets/coco-c-q95-severity5-all15-20260818/annotations/instances_val2017.json \
+  --artifacts work_dirs/mpmt_no_memory_coco_gaussian/artifacts \
+  --source-artifacts /bigdata/baoming/TTAOD-F-paper-original-causal/work_dirs/paper_original_direct_gtfree_full5000_run3/artifacts \
+  --output-dir work_dirs/mpmt_no_memory_coco_gaussian_analysis
 ```
 
-2. Test Time Adaptation:
-```
-python train.py configs/mm_grounding_dino/ttaod/ttaod_grounding_dino_swin-t_voc-c.py
-  --cfg-options corruption_type='gaussian_noise' 
-  detector.backbone.prompt_type='prepend'
-  detector.backbone.num_tokens=10
-  detector.backbone.prompt_deep=True
-  detector.backbone.TTWS_file='prompt_init/voc-c/prompt_voc_gaussian_noise.pth'
-  train_cfg.shot_capacity=15
-  train_cfg.alpha=5.0 train_cfg.beta=5.0
-  train_cfg.thre_me=0.3
-  --work-dir work_dirs/ttaod
-```
+The run records per-batch prediction, pseudo-labeling, and student-update time,
+selected parameters, initial/final prompt hashes, frozen parameter hashes,
+losses, and all raw predictions.
 
+## License and citation
 
-
-## Citing
-
-You can cite our paper with such bibtex:
-```
-@article{gao2025test,
-  title={Test-Time Adaptive Object Detection with Foundation Model},
-  author={Gao, Yingjie and Zhang, Yanan and Cai, Zhi and Huang, Di},
-  journal={arXiv preprint arXiv:2510.25175},
-  year={2025}
-}
-```
+The upstream project is distributed under the Apache 2.0 license retained in
+this fork. Please cite the original TTAOD-F paper and repository when using
+this ablation.
